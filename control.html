@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Server & Database Control Center</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: #FAF7F2; color: #3A2E2B; margin: 0; padding: 0; }
+    
+    .header { background: #2C221E; padding: 1.2rem 2rem; border-bottom: 4px solid #D4A373; display: flex; justify-content: space-between; align-items: center; color: #FAF7F2; }
+    .logo { font-size: 1.5rem; font-weight: 800; color: #F3E5D8; display: flex; align-items: center; gap: 0.5rem; }
+    
+    .nav-links { display: flex; gap: 1rem; }
+    .nav-btn { background: #8C6D46; color: white; text-decoration: none; padding: 0.5rem 1rem; border-radius: 6px; font-weight: 600; font-size: 0.9rem; }
+    .nav-btn:hover { background: #6F5536; }
+    .nav-btn.primary { background: #D4A373; color: #2C221E; font-weight: 800; }
+
+    .container { max-width: 1100px; margin: 2rem auto; padding: 0 1rem; }
+    .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
+    
+    .card { background: #FFFFFF; border: 1px solid #E8E2D9; border-radius: 12px; padding: 1.5rem; box-shadow: 0 4px 15px rgba(140,120,100,0.05); }
+    .card h3 { margin-top: 0; color: #2C221E; border-bottom: 2px solid #EADBC8; padding-bottom: 0.75rem; display: flex; justify-content: space-between; align-items: center; }
+
+    .metric { font-size: 2rem; font-weight: 800; color: #A67C52; margin: 0.5rem 0; }
+    .metric-sub { font-size: 0.85rem; color: #7A685D; }
+
+    button { width: 100%; padding: 0.75rem; border-radius: 6px; border: none; font-size: 0.95rem; font-weight: 700; cursor: pointer; margin-top: 0.75rem; transition: background 0.2s; }
+    .btn-green { background: #52796F; color: white; }
+    .btn-green:hover { background: #354F52; }
+    .btn-blue { background: #A67C52; color: white; }
+    .btn-blue:hover { background: #8C6D46; }
+
+    .status-pill { background: #E3EDE3; color: #1E4620; padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 700; }
+    .status-pill.offline { background: #FCE8E6; color: #8A1C14; }
+
+    pre { background: #FAF7F2; color: #2C221E; padding: 1rem; border-radius: 6px; overflow-x: auto; font-size: 0.85rem; border: 1px solid #E8E2D9; }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <div class="logo">⚡ Server & Database Control Center</div>
+    <div class="nav-links">
+      <a href="http://localhost:3000/" class="nav-btn">📥 Data Entry Portal</a>
+      <a href="http://localhost:3000/admin" class="nav-btn primary">🔑 Admin Portal</a>
+      <a href="https://supabase.com/dashboard/project/dygmhlghcmprjtvxjzxx" target="_blank" class="nav-btn">⚡ Supabase Dashboard</a>
+    </div>
+  </div>
+
+  <div class="container">
+    
+    <div class="grid-3">
+      
+      <!-- SERVER STATUS CARD -->
+      <div class="card">
+        <h3>⚙️ Server Status <span id="serverStatusPill" class="status-pill">ONLINE</span></h3>
+        <div class="metric" id="serverPort">Port 3000</div>
+        <div class="metric-sub" id="serverUptime">Uptime: Loading...</div>
+        <button onclick="refreshMetrics()" class="btn-blue">🔄 Refresh Server Status</button>
+      </div>
+
+      <!-- DATABASE ENGINE CARD -->
+      <div class="card">
+        <h3>🗄️ Database Engine <span id="dbModePill" class="status-pill">SUPABASE</span></h3>
+        <div class="metric" id="dbRecordsCount">...</div>
+        <div class="metric-sub" id="dbTarget">Target: https://dygmhlghcmprjtvxjzxx.supabase.co</div>
+        <button onclick="testDbConnection()" class="btn-green">⚡ Test DB Ping</button>
+        <button onclick="downloadJsonFile()" class="btn-blue">💾 Download JSON Backup File</button>
+      </div>
+
+      <!-- SYSTEM METRICS CARD -->
+      <div class="card">
+        <h3>🖥️ System Resources</h3>
+        <div class="metric" id="memUsage">RAM: ...</div>
+        <div class="metric-sub" id="sysPlatform">Platform: Local Node Process</div>
+        <button onclick="fetchSystemStats()" class="btn-blue">📊 View System Details</button>
+      </div>
+
+    </div>
+
+    <!-- LIVE DATABASE SUMMARY CARD -->
+    <div class="card">
+      <h3>📊 Live Database Summary</h3>
+      <div style="display:flex; gap:1rem; margin-bottom:1rem;">
+        <button onclick="fetchSystemStats()" style="width:auto; margin:0;" class="btn-blue">🔄 Refresh Metrics</button>
+        <button onclick="runDatabaseSeed()" style="width:auto; margin:0;" class="btn-green">🌱 Seed Default Admin (NOFEAR)</button>
+        <button onclick="downloadJsonFile()" style="width:auto; margin:0; padding:0.5rem 1rem;" class="btn-blue">💾 Instant JSON Download</button>
+      </div>
+      <pre id="systemStatsView">Loading statistics...</pre>
+    </div>
+
+  </div>
+
+  <script>
+    const SERVER_URL = 'http://localhost:3000';
+
+    async function fetchSystemStats() {
+      try {
+        const res = await fetch(SERVER_URL + '/api/system/stats');
+        const data = await res.json();
+        document.getElementById('serverStatusPill').className = 'status-pill';
+        document.getElementById('serverStatusPill').textContent = 'ONLINE';
+        document.getElementById('serverUptime').textContent = 'Uptime: ' + data.uptimeFormatted;
+        document.getElementById('dbRecordsCount').textContent = data.approvedRecordsCount + ' Records';
+        document.getElementById('memUsage').textContent = data.memoryUsageMB + ' MB RAM';
+        document.getElementById('systemStatsView').textContent = JSON.stringify(data, null, 2);
+      } catch (err) {
+        document.getElementById('serverStatusPill').className = 'status-pill offline';
+        document.getElementById('serverStatusPill').textContent = 'OFFLINE';
+        document.getElementById('systemStatsView').textContent = 'Server is offline. Start server by typing nofear in your terminal.';
+      }
+    }
+
+    async function downloadJsonFile() {
+      try {
+        const res = await fetch(SERVER_URL + '/api/system/backup');
+        if (!res.ok) throw new Error('Server returned ' + res.status);
+        const data = await res.text();
+        
+        const blob = new Blob([data], { type: 'application/json' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'database_backup.json';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+
+        alert('✅ JSON backup file downloaded successfully!');
+      } catch (err) {
+        alert('❌ Download failed. Make sure server is running on port 3000!');
+      }
+    }
+
+    async function testDbConnection() {
+      try {
+        const res = await fetch(SERVER_URL + '/api/data');
+        if (res.ok) alert('✅ Database Ping Successful!');
+        else alert('❌ Database Ping Failed');
+      } catch { alert('❌ Server is offline.'); }
+    }
+
+    async function runDatabaseSeed() {
+      try {
+        const res = await fetch(SERVER_URL + '/api/system/seed', { method: 'POST' });
+        const data = await res.json();
+        alert(data.message || 'Seeded successfully!');
+        fetchSystemStats();
+      } catch { alert('❌ Server is offline.'); }
+    }
+
+    function refreshMetrics() { fetchSystemStats(); }
+
+    fetchSystemStats();
+  </script>
+</body>
+</html>

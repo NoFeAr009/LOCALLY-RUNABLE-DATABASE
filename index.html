@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Data Entry Portal</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: #FAF7F2; color: #3A2E2B; margin: 0; padding: 0; }
+    
+    .top-header-banner {
+      position: sticky;
+      top: 0;
+      z-index: 9999;
+      background: #2C221E;
+      color: #FAF7F2;
+      padding: 1rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 4px solid #D4A373;
+      box-shadow: 0 4px 15px rgba(44, 34, 30, 0.15);
+    }
+    .header-logo { font-size: 1.5rem; font-weight: 800; color: #F3E5D8; display: flex; align-items: center; gap: 0.5rem; }
+    
+    .admin-portal-button {
+      background: #D4A373;
+      color: #2C221E;
+      text-decoration: none;
+      padding: 0.75rem 1.5rem;
+      border-radius: 8px;
+      font-weight: 800;
+      font-size: 1.05rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.6rem;
+      box-shadow: 0 4px 12px rgba(212, 163, 115, 0.4);
+      transition: all 0.2s ease-in-out;
+      border: 2px solid #EADBC8;
+    }
+    .admin-portal-button:hover { background: #BC8A5F; color: #ffffff; transform: scale(1.03); }
+
+    .main-container { padding: 2rem 1rem; }
+    .card { max-width: 900px; margin: 0 auto; background: #FFFFFF; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 15px rgba(140, 120, 100, 0.05); margin-bottom: 2rem; border: 1px solid #E8E2D9; }
+    h2, h3 { margin-top: 0; color: #2C221E; border-bottom: 2px solid #EADBC8; padding-bottom: 0.5rem; }
+    label { display: block; font-weight: 600; margin-top: 1rem; margin-bottom: 0.3rem; color: #5C4A42; }
+    input, textarea { width: 100%; padding: 0.75rem; border: 1px solid #D8CFC4; border-radius: 6px; font-size: 1rem; background: #FAF7F2; color: #2C221E; }
+    input:focus, textarea:focus { outline: none; border-color: #A67C52; background: #FFFFFF; }
+    button { width: 100%; margin-top: 1.2rem; padding: 0.85rem; background: #A67C52; color: white; border: none; border-radius: 6px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: background 0.2s; }
+    button:hover { background: #8C6D46; }
+    .status { margin-top: 1rem; padding: 0.75rem; border-radius: 6px; font-weight: 600; display: none; }
+    .status.success { background: #E3EDE3; color: #1E4620; display: block; border: 1px solid #C4DCC4; }
+    .status.error { background: #FCE8E6; color: #8A1C14; display: block; border: 1px solid #F5C2BE; }
+    
+    table { width: 100%; border-collapse: collapse; margin-top: 1rem; margin-bottom: 1.5rem; }
+    th, td { text-align: left; padding: 0.75rem; border-bottom: 1px solid #E8E2D9; font-size: 0.9rem; }
+    th { background: #F0EAE1; color: #2C221E; font-weight: 700; }
+    .badge-user { background: #EADBC8; color: #4A3525; padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: bold; }
+    .category-header { background: #F0EAE1; padding: 0.75rem 1rem; border-radius: 6px; border-left: 5px solid #A67C52; margin-top: 1.5rem; font-weight: bold; color: #2C221E; }
+    pre { background: #FAF7F2; color: #2C221E; padding: 0.75rem; border-radius: 6px; overflow-x: auto; font-size: 0.85rem; margin: 0; border: 1px solid #E8E2D9; }
+  </style>
+</head>
+<body>
+
+  <header class="top-header-banner">
+    <div class="header-logo">
+      📦 Data Entry Portal
+    </div>
+    <a href="http://localhost:3000/admin" class="admin-portal-button">
+      🔑 Admin Login Portal
+    </a>
+  </header>
+
+  <div class="main-container">
+    <div class="card">
+      <h2>📥 Store Data Record</h2>
+      <p style="color: #7A685D;">Save JSON or text data directly into your local database.</p>
+
+      <div id="statusBox" class="status"></div>
+
+      <form id="saveForm">
+        <label for="title">Title / Category Table Name</label>
+        <input type="text" id="title" placeholder="e.g. Student Records, Inventory, User Profile" required />
+
+        <label for="payload">JSON or Text Data</label>
+        <textarea id="payload" rows="4" placeholder='{"name": "John Doe", "role": "Student", "score": 95}' required></textarea>
+
+        <button type="submit">💾 Save Data Now</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <h2>📊 Approved Categorized Data Tables</h2>
+        <button type="button" onclick="loadData()" style="background: #8C6D46; margin-top: 0; width:auto; padding:0.4rem 1rem;">🔄 Refresh Tables</button>
+      </div>
+      <div id="tablesContainer">Loading records...</div>
+    </div>
+  </div>
+
+  <script>
+    const API_URL = 'http://localhost:3000/api/data';
+
+    function renderDataContentHTML(content) {
+      if (content === null || content === undefined) return '<em>No data</em>';
+      if (typeof content === 'object') {
+        if (Array.isArray(content)) {
+          if (content.length === 0) return '<em>Empty list</em>';
+          return '<div style="display:flex; flex-direction:column; gap:0.4rem;">' + content.map(item => {
+            if (typeof item === 'object') {
+              let rows = Object.entries(item).map(([k, v]) => `<tr><td style="font-weight:700; color:#5C4A42; width:35%; background:#F8F3EC; padding:0.4rem 0.6rem;">${k}</td><td style="padding:0.4rem 0.6rem;"><code>${typeof v === 'object' ? JSON.stringify(v) : v}</code></td></tr>`).join('');
+              return `<table style="margin:0; border:1px solid #E8E2D9; border-radius:6px; overflow:hidden;"><tbody>${rows}</tbody></table>`;
+            }
+            return `<div style="background:#FAF7F2; padding:0.4rem 0.6rem; border-radius:4px; border:1px solid #E8E2D9;">${item}</div>`;
+          }).join('') + '</div>';
+        }
+        let rows = Object.entries(content).map(([k, v]) => `<tr><td style="font-weight:700; color:#5C4A42; width:35%; background:#F8F3EC; padding:0.4rem 0.6rem;">${k}</td><td style="padding:0.4rem 0.6rem;"><code>${typeof v === 'object' ? JSON.stringify(v) : v}</code></td></tr>`).join('');
+        return `<table style="margin:0; border:1px solid #E8E2D9; border-radius:6px; overflow:hidden;"><tbody>${rows}</tbody></table>`;
+      }
+
+      const text = String(content).trim();
+      const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+      const isKeyValue = lines.length > 0 && lines.every(l => l.includes('=') || l.includes(':'));
+
+      if (isKeyValue) {
+        let rows = lines.map(line => {
+          let sep = line.includes('=') ? '=' : ':';
+          let parts = line.split(sep);
+          let key = parts[0].trim();
+          let val = parts.slice(1).join(sep).trim();
+          return `<tr><td style="font-weight:700; color:#5C4A42; width:35%; background:#F8F3EC; padding:0.4rem 0.6rem;">${key}</td><td style="font-weight:600; color:#2C221E; padding:0.4rem 0.6rem;">${val}</td></tr>`;
+        }).join('');
+        return `<table style="margin:0; border:1px solid #E8E2D9; border-radius:6px; overflow:hidden;"><tbody>${rows}</tbody></table>`;
+      }
+
+      return `<div style="background:#FAF7F2; padding:0.6rem; border-radius:6px; border:1px solid #E8E2D9; white-space:pre-wrap;">${text}</div>`;
+    }
+
+    async function loadData() {
+      try {
+        const res = await fetch(API_URL);
+        const data = await res.json();
+        const container = document.getElementById('tablesContainer');
+
+        if (!data || data.length === 0) {
+          container.innerHTML = '<p style="color:#7A685D;">No approved records found in database.</p>';
+          return;
+        }
+
+        const grouped = {};
+        data.forEach(item => {
+          const cat = item.title || item.category || 'General Records';
+          if (!grouped[cat]) grouped[cat] = [];
+          grouped[cat].push(item);
+        });
+
+        let html = '';
+        for (const [category, items] of Object.entries(grouped)) {
+          html += `
+            <div class="category-header">📋 Table Category: <strong>${category}</strong> (${items.length} records)</div>
+            <table>
+              <thead>
+                <tr>
+                  <th style="width:18%;">Category / Title</th>
+                  <th style="width:45%;">Entered Data Content</th>
+                  <th style="width:17%;">Entered By</th>
+                  <th style="width:20%;">Date & Time</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${items.map(item => {
+                  const dateStr = new Date(item.created_at || item.createdAt).toLocaleString();
+                  const updatedStr = item.updated_at ? `<br><small style="color:#2D6A4F; font-size:0.75rem;">Updated: ${new Date(item.updated_at).toLocaleTimeString()}</small>` : '';
+                  const userStr = item.submitted_by || item.submittedBy || 'Public User';
+                  return `
+                    <tr>
+                      <td><strong>${item.title || category}</strong><br><small style="color:#8C6D46; font-size:0.75rem;">ID: <code>${item.id}</code></small></td>
+                      <td>${renderDataContentHTML(item.content)}</td>
+                      <td><span class="badge-user">👤 ${userStr}</span></td>
+                      <td><small style="color:#5C4A42;">${dateStr}${updatedStr}</small></td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+          `;
+        }
+
+        container.innerHTML = html;
+      } catch (err) {
+        document.getElementById('tablesContainer').innerHTML = '<p style="color:#8A1C14;">Error connecting to server at http://localhost:3000</p>';
+      }
+    }
+
+    document.getElementById('saveForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const statusBox = document.getElementById('statusBox');
+      const title = document.getElementById('title').value;
+      const rawPayload = document.getElementById('payload').value;
+
+      let content;
+      try { content = JSON.parse(rawPayload); } catch { content = rawPayload; }
+
+      try {
+        const res = await fetch(API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title, content })
+        });
+        const saved = await res.json();
+        statusBox.className = 'status success';
+        statusBox.textContent = '✅ Submitted successfully! ID: ' + saved.id + ' (Awaiting approval if required)';
+        document.getElementById('title').value = '';
+        document.getElementById('payload').value = '';
+        loadData();
+      } catch (err) {
+        statusBox.className = 'status error';
+        statusBox.textContent = '❌ Failed to save data. Is server running on port 3000?';
+      }
+    });
+
+    loadData();
+  </script>
+</body>
+</html>
